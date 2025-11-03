@@ -6,7 +6,8 @@ dist/
 .dist/
 
 # Sample assets
-samples/
+samples/*
+!samples/.gitkeep
 
 # Environment files
 .env

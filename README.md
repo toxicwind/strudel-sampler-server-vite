@@ -41,6 +41,12 @@ Copy `.env.example` to `.env` and override as needed:
 
 For container/Portainer deployments, see `docker-compose.yml` and adjust the same variables.
 
+## Sample library tips
+
+- Mirror Strudel's naming expectations so your folders map to playable tokens (e.g. `samples/drums/bd`, `samples/drums/sd`, `samples/fx/risers`). Strudel will index each subfolder, which means `s("bd")` stays predictable once the manifest is rebuilt.  
+- Keep each kit or instrument under a dedicated folder (`samples/drums/roland-tr-808/`, `samples/keys/wurlitzer/`) and reserve descriptive filenames for multi-layered recordings.  
+- Use the dashboard at `http://localhost:5432/dashboard/` to verify new content and metadata (duration, format, size) before handing control to the dev UI.
+
 ## Scripts
 
 | Command | Description |
