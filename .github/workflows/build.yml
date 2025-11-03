@@ -12,32 +12,13 @@ jobs:
     strategy:
       matrix:
         node-version: ["18.x", "20.x"]
-    
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Type check
-        run: npm run type-check || true
-      
-      - name: Lint
-        run: npm run lint || true
-      
-      - name: Build
-        run: npm run build
-      
-      - name: Archive build
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.node-version }}
-          path: dist/
-          retention-days: 5
+      - run: npm ci
+      - run: npm run type-check || true
+      - run: npm run lint || true
+      - run: npm run build

@@ -6,20 +6,9 @@ labels: bug
 ---
 
 ## Description
-<!-- Clear description -->
 
 ## Steps to Reproduce
-1. 
-2. 
 
-## Expected Behavior
-<!-- What should happen -->
+## Expected
 
-## Actual Behavior
-<!-- What actually happens -->
-
-## Environment
-- Node version: 
-- npm version: 
-- OS: 
-- Docker version: 
+## Actual

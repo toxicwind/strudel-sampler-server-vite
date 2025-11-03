@@ -6,10 +6,7 @@ labels: enhancement
 ---
 
 ## Description
-<!-- Clear description -->
 
 ## Motivation
-<!-- Why is this needed? -->
 
 ## Use Case
-<!-- How would it be used? -->
