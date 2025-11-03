@@ -7,6 +7,8 @@
  * Or with tsx: tsx sampler-server.ts
  */
 
+import 'dotenv/config';
+
 import { createStandaloneServer } from './vite-plugin-strudel-sampler';
 import path from 'path';
 
@@ -17,6 +19,14 @@ const config = {
   cacheMaxSize: parseInt(process.env.CACHE_MAX_SIZE || '500'),
   enableHotReload: process.env.HOT_RELOAD !== 'false',
 };
+
+console.log('[config]', JSON.stringify({
+  sampleRoot: config.sampleRoot,
+  port: config.port,
+  cacheTTL: config.cacheTTL,
+  cacheMaxSize: config.cacheMaxSize,
+  enableHotReload: config.enableHotReload,
+}));
 
 createStandaloneServer(config).catch((error) => {
   console.error('✗ Failed to start server:', error.message);
