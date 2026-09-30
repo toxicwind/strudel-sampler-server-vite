@@ -1,85 +1,129 @@
-# Strudel Sampler Microservice
+# strudel-sampler-server-vite
 
-[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/Tests-Passing-45ba68?logo=github)](../../actions)
+**The sample-library backend for Strudel live-coding — point it at a folder of audio, get a Strudel-compatible JSON API, file streaming, and a built-in dashboard. Runs as a standalone microservice or as Vite middleware.**
 
-Production-ready sampler service that scans a local library, exposes Strudel-compatible JSON/streaming endpoints, and provides a Vite middleware plugin for live-coding workflows.
+[![Build](https://github.com/toxicwind/strudel-sampler-server-vite/actions/workflows/build.yml/badge.svg?style=for-the-badge)](https://github.com/toxicwind/strudel-sampler-server-vite/actions)
+![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4-000000?style=for-the-badge&logo=express&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-> ℹ️ This repository is consumed by [`strudel-dev-vite`](https://github.com/toxicwind/strudel-dev-vite) via git submodule (`apps/sampler`). You can develop here standalone or from the parent workspace.
+## Why this exists
+
+Strudel's `samples()` needs a URL that speaks its manifest format. This service is that URL: drop your drum kits and instruments into a folder, and it indexes them into a Strudel-compatible manifest, serves metadata and audio, and gives you a dashboard to verify everything before a session. No database, no build step for the dashboard, no ceremony.
+
+It's consumed by [`strudel-dev-vite`](https://github.com/toxicwind/strudel-dev-vite) as a git submodule (`apps/sampler`), but it runs perfectly well standalone.
+
+## Features
+
+- 📂 **Library scanning** — indexes `.mp3` `.wav` `.ogg` `.flac` `.m4a` `.aiff` (extend via `AUDIO_EXTENSIONS` in the plugin source)
+- 🗂️ **Strudel-compatible manifest** — `GET /` returns JSON that `Strudel.samples()` consumes directly
+- 📊 **Rich metadata** — format, duration, size via `music-metadata`, cached with TTL + max-size eviction
+- 🔥 **Hot reload** — file watchers invalidate caches instantly; in middleware mode they also notify the Vite dev server
+- 🖥️ **Embedded dashboard** — search, filter, and preview samples at `/dashboard`, served from a single self-contained HTML string
+- 🔌 **Two serving modes** — standalone Express server on `:5432`, or Vite middleware mounted at `/strudel-samples`
+- 🛡️ **Traversal-safe file serving** — `/files/*` rejects paths escaping the library root (403) and missing files (404)
+- 🐳 **Container-ready** — multi-stage Dockerfile plus `docker-compose.yml` with healthcheck on `/stats`, read-only sample mount, `restart: unless-stopped`
+- 🧪 **CI on every push** — build (Node 18/20 matrix), Docker, and release workflows
+
+## How it fits together
+
+```mermaid
+graph LR
+    samples[("samples/<br/>audio library")] --> scan["scanner<br/>AUDIO_EXTENSIONS"]
+    scan --> cache["metadata cache<br/>TTL + max entries"]
+    cache --> api["Express router"]
+    api --> m["GET /<br/>manifest"]
+    api --> md["GET /metadata"]
+    api --> st["GET /stats"]
+    api --> f["GET /files/*<br/>audio stream"]
+    api --> dash["GET /dashboard"]
+    api -.standalone<br/>:5432.-> mode1["sampler-server.ts"]
+    api -.vite middleware<br/>/strudel-samples.-> mode2["vite.config.ts"]
+    strudel["Strudel<br/>samples(url)"] --> m
+```
 
 ## Quick start
 
 ```bash
-git clone git@github.com:toxicwind/strudel-sampler-server-vite.git
-cd strudel-sampler-server-vite
-npm install
-cp .env.example .env
-npm run dev             # middleware mode at http://localhost:5173/strudel-samples
-# or
-npm run sampler         # tsx entrypoint at http://localhost:5432
+git clone git@github.com:toxicwind/strudel-sampler-server-vite.git && cd strudel-sampler-server-vite
+npm install && cp .env.example .env
+npm run sampler
 ```
 
-When working inside the parent workspace:
+Open <http://localhost:5432/dashboard/> to verify your library, then in Strudel:
 
-```bash
-cd strudel-dev-vite
-npm run sampler         # proxies to this package via workspace script
+```js
+samples('http://localhost:5432/')
+s("bd sd")
 ```
 
-## Environment
-
-Copy `.env.example` to `.env` and override as needed:
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `STRUDEL_SAMPLES` | `./samples` | Root directory to scan (absolute or relative). |
-| `PORT` | `5432` | HTTP port for the standalone server. |
-| `CACHE_TTL` | `3600000` | Metadata cache duration in ms. |
-| `CACHE_MAX_SIZE` | `500` | Max metadata entries before eviction. |
-| `HOT_RELOAD` | `true` | Enables file-watch invalidation in dev mode. |
-
-For container/Portainer deployments, see `docker-compose.yml` and adjust the same variables.
-
-## Sample library tips
-
-- Mirror Strudel's naming expectations so your folders map to playable tokens (e.g. `samples/drums/bd`, `samples/drums/sd`, `samples/fx/risers`). Strudel will index each subfolder, which means `s("bd")` stays predictable once the manifest is rebuilt.  
-- Keep each kit or instrument under a dedicated folder (`samples/drums/roland-tr-808/`, `samples/keys/wurlitzer/`) and reserve descriptive filenames for multi-layered recordings.  
-- Use the dashboard at `http://localhost:5432/dashboard/` to verify new content and metadata (duration, format, size) before handing control to the dev UI.
-
-## Scripts
-
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Vite middleware server with live reload dashboard (`/dashboard`). |
-| `npm run sampler` | tsx-powered local server (development). |
-| `npm run sampler:prod` | Runs the compiled JS from `dist/`. |
-| `npm run build` | TypeScript build into `dist/`. |
-| `npm run type-check` | Strict type checking. |
-| `npm run lint` | ESLint checks. |
+Prefer middleware mode inside a Vite project? `npm run dev` mounts the same router at <http://localhost:5173/strudel-samples>.
 
 ## API surface
 
-- `GET /` → JSON manifest compatible with `Strudel.samples()`.
-- `GET /manifest` → manifest only (used by dashboard).
-- `GET /metadata` → cached metadata (format, duration, size).
-- `GET /stats` → service stats (counts, root path, cache state).
-- `GET /files/:relativePath` → byte-range streaming route for audio files.
-- Dashboard available at `/dashboard/` in dev builds for search/filter/playback.
+| Route | Returns |
+| --- | --- |
+| `GET /` | JSON manifest compatible with `Strudel.samples()` |
+| `GET /manifest` | Manifest only (used by the dashboard) |
+| `GET /metadata` | Cached metadata: format, duration, size |
+| `GET /stats` | Service stats: counts, root path, cache state (also the Docker healthcheck) |
+| `GET /files/:relativePath` | Audio file stream (`Accept-Ranges: bytes`) |
+| `GET /dashboard` | Embedded dashboard UI (dev builds) |
 
-## Development notes
+## Architecture
 
-- Audio formats allowed: `.mp3`, `.wav`, `.ogg`, `.flac`, `.m4a`, `.aiff` (modify `AUDIO_EXTENSIONS` in `vite-plugin-strudel-sampler.ts` to extend).
-- Metadata is cached with TTL + max size; use `CACHE_TTL=0` to disable caching during heavy debugging.
-- File watchers run when `HOT_RELOAD=true`; they invalidate caches and notify the Vite dev server when used as middleware.
+| File | Role |
+| --- | --- |
+| `vite-plugin-strudel-sampler.ts` | The whole service: scanner, cache, Express router, Vite plugin, `createStandaloneServer()` |
+| `sampler-server.ts` | Standalone entry point — reads env config, starts the server |
+| `vite.config.ts` | Middleware-mode config (mounts at `/strudel-samples` on `:5173`) |
+| `Dockerfile` | Multi-stage build → `node dist/sampler-server.js` on `:5432` |
+| `docker-compose.yml` | One-container deployment with healthcheck + read-only volume |
+| `deploy-prod.py` / `run.sh` | Production deploy and local-run helpers |
+| `samples/` | Your audio library (git-ignored) |
 
-## Integration checklist
+## Configuration
 
-1. Ensure your samples live under the folder referenced by `STRUDEL_SAMPLES` (bind-mount when using Docker).
-2. Run `npm run sampler` and visit `http://localhost:5432/dashboard/` to verify indexing.
-3. In Strudel, call `samples('http://localhost:5432/')` and trigger e.g. `s("kick_deep_95gm")`.
-4. From the parent `strudel-dev-vite` repo, start the dev UI (`npm run dev`) and the sampler concurrently for a full-stack loop.
+Copy `.env.example` to `.env`:
 
-## License
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `STRUDEL_SAMPLES` | `$HOME/strudel-dev/samples` (code fallback; `.env.example` sets `./samples`) | Audio library root |
+| `PORT` | `5432` | Standalone server port |
+| `CACHE_TTL` | `3600000` | Metadata cache TTL in ms (`0` disables) |
+| `CACHE_MAX_SIZE` | `500` | Max cached metadata entries before eviction |
+| `HOT_RELOAD` | `true` | File-watch invalidation (any value other than `false` enables) |
 
-Released under the MIT License. See `LICENSE` for details.
+For Portainer deployments, `docker-compose.yml` reads the same variables and `.env.portainer` documents the shape.
+
+## Development
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Vite middleware server with live dashboard at `/dashboard` |
+| `npm run sampler` | Standalone server via `tsx` (development) |
+| `npm run sampler:prod` | Runs the compiled `dist/` output |
+| `npm run build` | TypeScript build into `dist/` |
+| `npm run type-check` | Strict type checking |
+| `npm run lint` | ESLint checks |
+
+Contributing (from `CONTRIBUTING.md`): fork & branch → `npm ci`, `npm run type-check`, `npm run build` → commit & PR. A PR template and bug/feature issue templates are in the repo.
+
+Deploy the container:
+
+```bash
+docker build -t strudel-sampler .
+STRUDEL_SAMPLES=/path/to/your/library docker compose up -d
+```
+
+## Sample library tips
+
+- Mirror Strudel's naming expectations so folders map to playable tokens (`samples/drums/bd`, `samples/fx/risers`).
+- Keep each kit or instrument under a dedicated folder (`samples/drums/roland-tr-808/`, `samples/keys/wurlitzer/`); use descriptive filenames for multi-layered recordings.
+- After adding files, check the dashboard for duration, format, and size before handing control to the dev UI.
+
+## License and security
+
+- **License:** `package.json` declares MIT, but no `LICENSE` file is present in the tree yet — one should be added to make the grant effective.
+- **Security:** `SECURITY.md` currently lists a placeholder contact address; until it's updated, use GitHub issues for security reports. No secrets are committed — local overrides belong in `.env` (git-ignored).
